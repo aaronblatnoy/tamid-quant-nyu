@@ -52,6 +52,7 @@ ENTRY_DAYS_BEFORE = 28          # enter 4 weeks before playoffs (fixed calendar)
 RISK_FREE_RATE = 0.05
 SHORT_EXPIRY_DAYS = 30          # front-month: expires ~30 days out
 LONG_EXPIRY_DAYS = 90           # back-month: expires ~90 days out
+SPREAD_PROFIT_TARGET = 0.20     # close spread at 20% profit
 
 # ─────────────────────────────────────────────
 # 1. FETCH DATA
@@ -113,14 +114,37 @@ for year, playoff_date in PLAYOFF_STARTS.items():
     vega_long_entry = bs_vega(entry_price, strike, T_long_entry, RISK_FREE_RATE, entry_vol)
     net_vega_entry = vega_long_entry - vega_short_entry
 
-    # Exit at short leg expiry (or end of data)
+    # Check daily for profit target, otherwise hold to short expiry
     exit_target = entry_date + timedelta(days=SHORT_EXPIRY_DAYS)
     hold_window = df[(df.index > entry_date) & (df.index <= exit_target)]
 
     if hold_window.empty:
         continue
 
-    exit_date = hold_window.index[-1]
+    exit_date = None
+    exit_reason = "Short Expiry"
+
+    for dt, row in hold_window.iterrows():
+        spot = float(row["Close"])
+        vol = float(row["garch_vol"])
+        days_elapsed = (dt - entry_date).days
+        T_short_now = max((SHORT_EXPIRY_DAYS - days_elapsed) / 365, 0)
+        T_long_now = max((LONG_EXPIRY_DAYS - days_elapsed) / 365, 0)
+
+        short_now = bs_call(spot, strike, T_short_now, RISK_FREE_RATE, vol)
+        long_now = bs_call(spot, strike, T_long_now, RISK_FREE_RATE, vol)
+        spread_value = long_now - short_now
+        current_pnl_pct = (spread_value - net_debit) / net_debit
+
+        if current_pnl_pct >= SPREAD_PROFIT_TARGET:
+            exit_date = dt
+            exit_reason = f"Profit Target ({current_pnl_pct*100:.0f}%)"
+            break
+
+    # If no early exit, close at short expiry
+    if exit_date is None:
+        exit_date = hold_window.index[-1]
+
     exit_price = float(df.loc[exit_date, "Close"])
     exit_vol = float(df.loc[exit_date, "garch_vol"])
     days_held = (exit_date - entry_date).days
@@ -128,12 +152,9 @@ for year, playoff_date in PLAYOFF_STARTS.items():
     T_short_exit = max((SHORT_EXPIRY_DAYS - days_held) / 365, 0)
     T_long_exit = max((LONG_EXPIRY_DAYS - days_held) / 365, 0)
 
-    # Reprice both legs at exit
     short_call_exit = bs_call(exit_price, strike, T_short_exit, RISK_FREE_RATE, exit_vol)
     long_call_exit = bs_call(exit_price, strike, T_long_exit, RISK_FREE_RATE, exit_vol)
 
-    # PnL = (long leg gain) - (short leg loss)
-    # At exit: we buy back the short, sell the long
     spread_value_exit = long_call_exit - short_call_exit
     pnl = spread_value_exit - net_debit
     pnl_pct = (pnl / net_debit) * 100 if net_debit > 0 else 0
@@ -148,6 +169,7 @@ for year, playoff_date in PLAYOFF_STARTS.items():
         "Net Debit": round(net_debit, 2),
         "Net Vega": round(net_vega_entry, 2),
         "Exit Date": exit_date.date(),
+        "Exit Reason": exit_reason,
         "Exit Price": round(exit_price, 2),
         "Exit Vol": round(exit_vol * 100, 1),
         "Spread Value Exit": round(spread_value_exit, 2),

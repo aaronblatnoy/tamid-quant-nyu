@@ -4,13 +4,14 @@ JEDI — Political Beta Factor Model for U.S. Defense Equities
 =============================================================
 Backtest implementation for the TAMID Quant JEDI strategy.
 
-Daily changes in Polymarket political prediction market probabilities are used
-to predict next-day log returns of a custom equal-weight defense equity index
+Hourly changes in Polymarket political prediction market probabilities are used
+to predict next-hour log returns of a custom equal-weight defense equity index
 ("JEDI": LMT, RTX, NOC, GD, HII, BAH, LDOS).
 
-Core model: PCA → Elastic Net (walk-forward, rolling 252-day window).
-Signal: long if predicted return > +0.15%, short if < -0.15%, flat otherwise.
-Position sizing: quarter-Kelly scaled by rolling 21-day IC.
+Core model: PCA → Elastic Net (walk-forward, rolling window).
+Signal: long if predicted return > threshold, short if < -threshold, flat otherwise.
+Position sizing: quarter-Kelly scaled by rolling IC.
+Frequency: Hourly (intraday trading during market hours).
 
 Data source: Polymarket public API (no API key required).
 
@@ -42,9 +43,12 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import ElasticNetCV
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
+from sklearn.exceptions import ConvergenceWarning
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning, module="yfinance")
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore", message="An input array is constant")
 
 # ---------------------------------------------------------------------------
 # 1. CONFIGURATION
@@ -56,8 +60,12 @@ CONFIG = {
     # Benchmark
     "benchmark_ticker": "ITA",
     # Data history
-    "start_date": "2024-01-02",
+    "start_date": "2020-01-02",
     "end_date": "2026-03-14",
+    # Frequency settings
+    "data_frequency": "1d",         # daily bars
+    "bars_per_day": 1,              # 1 bar per trading day
+    "annualization_factor": 252,    # 252 trading days per year
     # Polymarket API (public, no key required)
     "polymarket_gamma_url": "https://gamma-api.polymarket.com",
     "polymarket_clob_url": "https://clob.polymarket.com",
@@ -86,26 +94,29 @@ CONFIG = {
         "oscars", "grammy", "emmy", "bachelor", "will trump say",
         "what will trump say", "democratic presidential", "republican presidential",
     ],
-    # Minimum daily data points for a market to be included
-    "min_market_history_days": 15,
+    # Minimum data points for a market to be included
+    "min_market_history_bars": 15,  # 15 daily data points
     # Max markets to include
     "max_markets": 60,
-    # Model parameters
-    "rolling_window": 120,          # trading days for training (shorter for Polymarket's limited history)
-    "refit_frequency": 21,          # re-estimate betas every 21 days (~monthly)
+    # Model parameters (in daily bars)
+    "rolling_window": 120,          # 120 trading days
+    "refit_frequency": 21,          # 21 trading days
     "pca_variance_threshold": 0.95, # keep components explaining 95% variance
     "elastic_net_l1_ratios": [0.1, 0.3, 0.5, 0.7, 0.9, 0.95],
     "ts_cv_splits": 5,             # TimeSeriesSplit folds
     # Signal & position sizing
-    "signal_threshold": 0.0005,     # ±0.05% predicted return (calibrated to Polymarket signal magnitude)
+    "signal_threshold": 0.0005,     # ±0.05% predicted return (daily)
     "kelly_fraction": 0.25,         # quarter-Kelly
-    "ic_rolling_window": 21,        # rolling IC lookback
+    "ic_rolling_window": 21,        # 21 trading days
     "leverage_cap": 2.0,            # max gross leverage
     # Risk management
     "drawdown_half_stop": -0.05,    # -5% drawdown → halve position
     "drawdown_flat_stop": -0.10,    # -10% drawdown → go flat
-    # Forward-fill limit for probability gaps
+    # Forward-fill limit for probability gaps (days)
     "ffill_limit": 5,
+    # Polymarket fidelity (minutes per candle: 60=hourly, 1440=daily)
+    # Daily is better — most markets don't trade every hour
+    "polymarket_fidelity": 1440,
     # Output
     "output_dir": Path(__file__).resolve().parent / "output",
 }
@@ -244,7 +255,7 @@ class PolymarketClient:
         self, token_id: str, fidelity: int = 1440
     ) -> Optional[pd.Series]:
         """
-        Fetch daily price history for a single market token.
+        Fetch price history for a single market token.
 
         Args:
             token_id: Polymarket CLOB token ID (YES outcome)
@@ -311,12 +322,13 @@ class PolymarketClient:
         # Fetch histories for top markets by volume
         prob_series = {}
         n_checked = 0
+        fidelity = CONFIG.get("polymarket_fidelity", 60)
         for m in markets:
             if len(prob_series) >= max_markets:
                 break
             n_checked += 1
 
-            series = self.fetch_price_history(m["yes_token"])
+            series = self.fetch_price_history(m["yes_token"], fidelity=fidelity)
             if series is not None and len(series) >= min_history_days:
                 # Clean column name
                 q = m["question"][:50].replace(" ", "_").replace("?", "")
@@ -441,14 +453,34 @@ class PolymarketClient:
 # 3. DATA FETCHING
 # ---------------------------------------------------------------------------
 
+def _download_daily(tickers, start: str, end: str) -> pd.DataFrame:
+    """
+    Download daily data from yfinance. No date limit for daily bars.
+    """
+    data = yf.download(
+        tickers,
+        start=start,
+        end=end,
+        interval="1d",
+        progress=False,
+    )
+    if data.empty:
+        return pd.DataFrame()
+    data = data[~data.index.duplicated(keep="last")]
+    return data.sort_index()
+
+
 def fetch_jedi_index(tickers: list[str], start: str, end: str) -> pd.DataFrame:
     """
-    Download JEDI constituent prices from Yahoo Finance.
+    Download JEDI constituent prices from Yahoo Finance (daily).
     Returns DataFrame with columns: 'jedi_close', 'jedi_log_return'.
     Equal-weight index based on daily log returns.
     """
-    log.info(f"Downloading JEDI constituents: {tickers}")
-    data = yf.download(tickers, start=start, end=end, progress=False)
+    log.info(f"Downloading JEDI constituents (daily): {tickers}")
+    data = _download_daily(tickers, start, end)
+
+    if data.empty:
+        raise ValueError("Failed to download JEDI constituent data from Yahoo Finance.")
 
     if "Close" in data.columns and not isinstance(data.columns, pd.MultiIndex):
         closes = data[["Close"]].copy()
@@ -479,17 +511,18 @@ def fetch_jedi_index(tickers: list[str], start: str, end: str) -> pd.DataFrame:
         "jedi_log_return": jedi_log_return,
     }).dropna()
 
-    log.info(f"  JEDI index: {len(result)} trading days from {result.index[0].date()} to {result.index[-1].date()}")
+    log.info(f"  JEDI index: {len(result)} daily bars "
+             f"from {result.index[0]} to {result.index[-1]}")
     return result
 
 
 def fetch_benchmark(ticker: str, start: str, end: str) -> pd.DataFrame:
     """
-    Download benchmark (ITA) prices from Yahoo Finance.
+    Download benchmark (ITA) prices from Yahoo Finance (daily).
     Returns DataFrame with 'bench_close' and 'bench_log_return'.
     """
-    log.info(f"Downloading benchmark: {ticker}")
-    data = yf.download(ticker, start=start, end=end, progress=False)
+    log.info(f"Downloading benchmark (daily): {ticker}")
+    data = _download_daily(ticker, start, end)
 
     if data.empty:
         raise ValueError(f"Failed to download benchmark {ticker}.")
@@ -507,7 +540,7 @@ def fetch_benchmark(ticker: str, start: str, end: str) -> pd.DataFrame:
         "bench_log_return": log_ret,
     }).dropna()
 
-    log.info(f"  Benchmark: {len(result)} trading days")
+    log.info(f"  Benchmark: {len(result)} daily bars")
     return result
 
 
@@ -527,7 +560,7 @@ def fetch_polymarket_probabilities(config: dict) -> pd.DataFrame:
         prob_df = client.fetch_all_probabilities(
             keywords=config["polymarket_keywords"],
             exclude_keywords=config.get("polymarket_exclude_keywords", []),
-            min_history_days=config["min_market_history_days"],
+            min_history_days=config["min_market_history_bars"],
             max_markets=config["max_markets"],
         )
     except Exception as e:
@@ -535,19 +568,14 @@ def fetch_polymarket_probabilities(config: dict) -> pd.DataFrame:
         prob_df = None
 
     if prob_df is not None and len(prob_df.columns) >= 3 and len(prob_df) >= 50:
-        log.info(f"  Live Polymarket data: {prob_df.shape[1]} markets, {len(prob_df)} days")
+        log.info(f"  Live Polymarket data: {prob_df.shape[1]} markets, {len(prob_df)} daily bars")
         return prob_df
 
-    log.warning("=" * 70)
-    log.warning("  FALLING BACK TO SYNTHETIC DATA — Polymarket API returned")
-    log.warning("  insufficient data. This may be due to API changes or")
-    log.warning("  limited market history. Results use simulated probabilities.")
-    log.warning("=" * 70)
-
-    prob_df = PolymarketClient.generate_synthetic_probabilities(
-        config["start_date"], config["end_date"]
+    raise ValueError(
+        "Polymarket API returned insufficient data. "
+        f"Got {len(prob_df.columns) if prob_df is not None else 0} markets. "
+        "Check API connectivity and keyword filters."
     )
-    log.info(f"  Synthetic data: {prob_df.shape[1]} markets, {len(prob_df)} days")
     return prob_df
 
 
@@ -561,18 +589,19 @@ def engineer_features(
     ffill_limit: int = 5,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Compute features (ΔP: daily probability changes) and align with
-    next-day JEDI returns (the core one-day lag hypothesis).
+    Compute features (daily ΔP from Polymarket) and broadcast to hourly
+    stock bars for hourly trading.
 
-    Handles sparse/unbalanced panels: markets that don't exist on a given
-    day get ΔP=0 (no change), which is the neutral assumption.
+    Daily Polymarket signal → daily features aligned to daily stock returns.
+    Target = next-day JEDI log return.
 
     Returns:
-        features: DataFrame of ΔP values at day t
+        features: DataFrame of ΔP values at each trading day
         target: Series of JEDI log returns at day t+1
     """
     log.info("Engineering features...")
 
+    # Compute daily ΔP from Polymarket
     probs_filled = probs.ffill(limit=ffill_limit)
     delta_p = probs_filled.diff()
     delta_p = delta_p.dropna(axis=1, how="all")
@@ -585,23 +614,40 @@ def engineer_features(
     if delta_p.empty:
         raise ValueError("No valid ΔP features after filtering.")
 
-    log.info(f"  ΔP features: {delta_p.shape[1]} markets retained")
+    log.info(f"  ΔP features: {delta_p.shape[1]} markets retained (daily)")
 
-    # Keep NaNs for now — the walk-forward model will handle sparse panels
-    # by selecting columns with sufficient data in each training window
+    # Normalize both indices to tz-naive dates for alignment
+    stock_dates = jedi_data.index
+    if stock_dates.tz is not None:
+        stock_dates_naive = stock_dates.tz_localize(None).normalize()
+    else:
+        stock_dates_naive = stock_dates.normalize()
 
-    # Align: features at day t, target = JEDI return at day t+1
+    if delta_p.index.tz is not None:
+        delta_p.index = delta_p.index.tz_localize(None)
+    delta_p.index = delta_p.index.normalize()
+    delta_p = delta_p[~delta_p.index.duplicated(keep="last")]
+
+    # Align daily ΔP to stock trading days
+    daily_features = delta_p.reindex(stock_dates_naive)
+    daily_features.index = stock_dates  # restore original index
+
+    # Drop rows where all features are NaN (before Polymarket data starts)
+    daily_features = daily_features.dropna(how="all")
+
+    # Target = next-day JEDI log return
     target = jedi_data["jedi_log_return"].shift(-1)
 
-    common_dates = delta_p.index.intersection(target.index)
-    features = delta_p.loc[common_dates]
-    target = target.loc[common_dates]
+    common_idx = daily_features.index.intersection(target.index)
+    features = daily_features.loc[common_idx]
+    target = target.loc[common_idx]
 
     valid_mask = target.notna()
     features = features.loc[valid_mask]
     target = target.loc[valid_mask]
 
-    log.info(f"  Aligned dataset: {len(features)} observations, {features.shape[1]} features")
+    log.info(f"  Aligned dataset: {len(features)} daily bars, "
+             f"{features.shape[1]} features")
     return features, target
 
 
@@ -921,7 +967,7 @@ def run_backtest(
     bench_peak = results["bench_equity"].cummax()
     results["bench_drawdown"] = (results["bench_equity"] - bench_peak) / bench_peak
 
-    log.info(f"  Backtest complete: {len(results)} trading days")
+    log.info(f"  Backtest complete: {len(results)} daily bars")
     return results
 
 
@@ -936,25 +982,27 @@ def compute_performance(results: pd.DataFrame) -> dict:
     strat_ret = results["strategy_return"].dropna()
     bench_ret = results["bench_return"].dropna()
 
+    ann_factor = CONFIG.get("annualization_factor", 252 * 7)
+
     def _metrics(returns: pd.Series, equity_col: str) -> dict:
-        n_days = len(returns)
-        if n_days < 10:
+        n_bars = len(returns)
+        if n_bars < 10:
             return {k: 0.0 for k in [
                 "total_return", "cagr", "sharpe", "sortino",
                 "max_drawdown", "calmar", "win_rate", "profit_factor"
             ]}
 
         total_ret = results[equity_col].iloc[-1] / results[equity_col].iloc[0] - 1
-        n_years = n_days / 252
+        n_years = n_bars / ann_factor
         cagr = (1 + total_ret) ** (1 / n_years) - 1 if n_years > 0 else 0
 
-        daily_mean = returns.mean()
-        daily_std = returns.std()
-        sharpe = (daily_mean / daily_std) * np.sqrt(252) if daily_std > 0 else 0
+        bar_mean = returns.mean()
+        bar_std = returns.std()
+        sharpe = (bar_mean / bar_std) * np.sqrt(ann_factor) if bar_std > 0 else 0
 
         downside = returns[returns < 0]
-        downside_std = downside.std() if len(downside) > 0 else daily_std
-        sortino = (daily_mean / downside_std) * np.sqrt(252) if downside_std > 0 else 0
+        downside_std = downside.std() if len(downside) > 0 else bar_std
+        sortino = (bar_mean / downside_std) * np.sqrt(ann_factor) if downside_std > 0 else 0
 
         equity = results[equity_col]
         peak = equity.cummax()
@@ -1086,17 +1134,18 @@ def save_plots(results: pd.DataFrame, output_dir: Path):
     # --- Plot 3: Rolling 63-Day Sharpe Comparison ---
     fig, ax = plt.subplots(figsize=fig_size, dpi=dpi)
 
-    roll_window = 63
+    ann_factor = CONFIG.get("annualization_factor", 252)
+    roll_window = 63  # 63 trading days
 
     strat_rolling_sharpe = (
         results["strategy_return"].rolling(roll_window).mean()
         / results["strategy_return"].rolling(roll_window).std()
-    ) * np.sqrt(252)
+    ) * np.sqrt(ann_factor)
 
     bench_rolling_sharpe = (
         results["bench_return"].rolling(roll_window).mean()
         / results["bench_return"].rolling(roll_window).std()
-    ) * np.sqrt(252)
+    ) * np.sqrt(ann_factor)
 
     ax.plot(results.index, strat_rolling_sharpe, linewidth=1.5,
             color="#1f77b4", label="JEDI Strategy", alpha=0.9)
@@ -1104,7 +1153,7 @@ def save_plots(results: pd.DataFrame, output_dir: Path):
             color="#ff7f0e", label="ITA Benchmark", alpha=0.7, linestyle="--")
     ax.axhline(y=0, color="black", linewidth=0.8, alpha=0.5)
 
-    ax.set_title("JEDI Strategy — Rolling 63-Day Sharpe Ratio",
+    ax.set_title("JEDI Strategy — Rolling 63-Day Sharpe Ratio (Daily)",
                  fontsize=16, fontweight="bold", pad=15)
     ax.set_ylabel("Annualized Sharpe Ratio", fontsize=12)
     ax.set_xlabel("")
@@ -1128,7 +1177,7 @@ def main():
     """Orchestrate the full JEDI strategy backtest pipeline."""
     print("\n" + "=" * 72)
     print("  JEDI — Political Beta Factor Model for U.S. Defense Equities")
-    print("  TAMID Quant @ NYU — Strategy Backtest")
+    print("  TAMID Quant @ NYU — Strategy Backtest (DAILY)")
     print("  Data Source: Polymarket (public API, no key required)")
     print("=" * 72 + "\n")
 

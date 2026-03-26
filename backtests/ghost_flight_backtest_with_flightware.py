@@ -396,5 +396,5 @@ ax3.set_title("Strategy Drawdown")
 ax3.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
 
 plt.tight_layout()
-plt.savefig("/Users/arthurmonastyrsky/Downloads/ghost_flight_backtest.png", dpi=150, bbox_inches="tight")
+plt.savefig("/Users/aaron_7nh0yzm/Downloads/ghost_flight_backtest.png", dpi=150, bbox_inches="tight")
 print("\nChart saved.")

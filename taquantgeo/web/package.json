@@ -1,0 +1,9 @@
+{
+  "name": "taquantgeo-web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Placeholder until Phase 6 — to be replaced by `pnpm create next-app@latest`",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {}
+}

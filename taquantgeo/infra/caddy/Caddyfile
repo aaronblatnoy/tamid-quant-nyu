@@ -1,0 +1,8 @@
+# Caddy config for production reverse proxy on Hetzner CX32.
+# Replaces nginx — auto-HTTPS via Let's Encrypt, simpler config.
+# Drop-in once we provision the host.
+
+api.taquantgeo.example {
+    encode zstd gzip
+    reverse_proxy app:8000
+}

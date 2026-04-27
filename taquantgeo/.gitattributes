@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+# Binary files
+*.parquet binary
+*.duckdb binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary
+*.gz binary
+
+# Generated files (mark to keep diffs clean)
+uv.lock linguist-generated=true
+package-lock.json linguist-generated=true
+pnpm-lock.yaml linguist-generated=true

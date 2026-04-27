@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Research log
+    url: https://github.com/sn12-dev/taquantgeo/blob/main/docs/RESEARCH_LOG.md
+    about: For ongoing research notes, prefer the research log over an issue.
+  - name: Architecture
+    url: https://github.com/sn12-dev/taquantgeo/blob/main/docs/architecture.md
+    about: Read the system design before filing structural issues.

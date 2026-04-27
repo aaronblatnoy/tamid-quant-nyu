@@ -1,0 +1,38 @@
+# Local development stack. Production uses Neon (Postgres) and Hetzner CX32
+# (which only runs the app container + Caddy). This file is for `docker compose
+# up -d` during local development.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: taq-postgres
+    environment:
+      POSTGRES_USER: taq
+      POSTGRES_PASSWORD: taq
+      POSTGRES_DB: taquantgeo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taq -d taquantgeo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: taq-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

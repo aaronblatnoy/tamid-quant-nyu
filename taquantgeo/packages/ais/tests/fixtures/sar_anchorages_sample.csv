@@ -1,0 +1,4 @@
+s2id,lat,lon,label,sublabel,label_source,iso3,distance_from_shore_m,drift_radius,dock
+anc_rastanura,26.70,50.18,RAS TANURA,,TEST,SAU,0.0,0.5,True
+anc_basrah,29.72,48.83,BASRAH OT,,TEST,IRQ,0.0,0.5,True
+anc_das,25.14,52.88,DAS ISLAND,,TEST,ARE,0.0,0.5,True

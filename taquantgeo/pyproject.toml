@@ -1,0 +1,121 @@
+# Virtual workspace root. No [project] section — workspace members under packages/
+# are independently buildable packages. Tooling configs (ruff, basedpyright, pytest)
+# live here so they apply across the whole tree.
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "pytest-recording>=0.13",
+    "hypothesis>=6.0",
+    "ruff>=0.7",
+    "basedpyright>=1.21",
+    "pre-commit>=4.0",
+    "ipykernel>=6.0",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+taquantgeo-core = { workspace = true }
+taquantgeo-ais = { workspace = true }
+taquantgeo-signals = { workspace = true }
+taquantgeo-backtest = { workspace = true }
+taquantgeo-trade = { workspace = true }
+taquantgeo-api = { workspace = true }
+taquantgeo-jobs = { workspace = true }
+taquantgeo-prices = { workspace = true }
+taquantgeo-cli = { workspace = true }
+
+# ---------- Ruff ----------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/*/src", "tests"]
+extend-exclude = ["research/notebooks", "infra/alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle, pyflakes
+    "I",              # isort
+    "B",              # bugbear
+    "UP",             # pyupgrade
+    "N",              # pep8-naming
+    "SIM",            # flake8-simplify
+    "RUF",            # ruff-specific
+    "TCH",            # flake8-type-checking
+    "PT",             # pytest-style
+    "ASYNC",          # async correctness
+    "S",              # security (bandit)
+    "PL",             # pylint subset
+]
+ignore = [
+    "E501",           # line length handled by formatter
+    "PLR0913",        # too many args (false positives in dataclasses/configs)
+    "PLR2004",        # magic values; pragmatic in tests + glue code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]
+"packages/cli/**" = ["T20"]
+"packages/jobs/**" = ["S104"]
+"infra/alembic/**" = ["E402", "F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "taquantgeo_core",
+    "taquantgeo_ais",
+    "taquantgeo_signals",
+    "taquantgeo_backtest",
+    "taquantgeo_trade",
+    "taquantgeo_api",
+    "taquantgeo_jobs",
+    "taquantgeo_prices",
+    "taquantgeo_cli",
+]
+
+# ---------- basedpyright ----------
+[tool.basedpyright]
+pythonVersion = "3.12"
+include = ["packages/*/src", "tests"]
+exclude = ["**/node_modules", "**/__pycache__", "research/notebooks", "**/.venv"]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownVariableType = "warning"
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+minversion = "8.0"
+asyncio_mode = "auto"
+testpaths = ["tests", "packages"]
+python_files = ["test_*.py"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--showlocals"]
+markers = [
+    "slow: slow tests (skip with -m 'not slow')",
+    "integration: requires postgres/redis",
+    "live: hits live external APIs (skip in CI)",
+]
+
+# ---------- coverage ----------
+[tool.coverage.run]
+source = ["packages"]
+branch = true
+omit = ["**/tests/**", "**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@(abc\\.)?abstractmethod",
+]

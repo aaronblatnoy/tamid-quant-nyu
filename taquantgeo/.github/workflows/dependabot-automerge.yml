@@ -1,0 +1,59 @@
+name: dependabot-automerge
+
+# Triggered when the `ci` workflow finishes. If that run was a Dependabot PR
+# and CI passed, squash-merge the PR. Major version bumps are filtered out at
+# the Dependabot config level (.github/dependabot.yml `ignore` rules), so any
+# PR reaching this point is patch/minor only and safe to merge unattended.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Identify PR and confirm Dependabot authorship
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          PR_NUM=$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number // empty')
+          if [ -z "$PR_NUM" ]; then
+            echo "No PR for sha ${HEAD_SHA}"; exit 0
+          fi
+
+          AUTHOR=$(gh pr view "$PR_NUM" --repo "$REPO" --json author --jq '.author.login')
+          if [ "$AUTHOR" != "dependabot" ] && [ "$AUTHOR" != "dependabot[bot]" ]; then
+            echo "PR #$PR_NUM author is $AUTHOR; skipping (not Dependabot)"; exit 0
+          fi
+
+          # Manual override: if the PR has the `needs-manual-review` label, do nothing.
+          LABELS=$(gh pr view "$PR_NUM" --repo "$REPO" --json labels --jq '.labels[].name' | tr '\n' ' ')
+          if echo "$LABELS" | grep -qw "needs-manual-review"; then
+            echo "PR #$PR_NUM has needs-manual-review label; skipping"; exit 0
+          fi
+
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "Will merge PR #$PR_NUM"
+
+      - name: Squash merge
+        if: steps.pr.outputs.pr_number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge ${{ steps.pr.outputs.pr_number }} \
+            --repo ${{ github.repository }} \
+            --squash \
+            --delete-branch

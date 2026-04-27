@@ -1,0 +1,103 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - gateway.api.globalfishingwatch.org
+      User-Agent:
+      - python-httpx/0.28.1
+      authorization:
+      - REDACTED
+    method: GET
+    uri: https://gateway.api.globalfishingwatch.org/v3/events?datasets%5B0%5D=public-global-gaps-events%3Alatest&start-date=2023-01-01&end-date=2024-01-01&limit=5&offset=0&vessels%5B0%5D=ee0b997e5-52c5-19fe-2926-cb1d2d235599
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/41U226bQBD9l30GtFfY5S3XpkqVWLGlSo3ysMBg0wKLAFtJI/97Z8FJ3LgPtSzB
+        np2ZPXvmDK+kgdEWdrQkfSX+OcA4kPSRdNusrvJwXbvM1uHadkMIO2jHId3JiJKngOxgGKCeggFo
+        ZkwCKlQ8VyEzJYTc8DjMM1bwgguljPE5eAI82HYN/riydw1JCadchJThnwRkdDMiD8h+H5C6aqqR
+        pCogriyRH0lpQFp4Hu8Py3Zb1z51tDVJWUCQZl+BZ/ZKhtH24/spOmR0xWgqTap4RCn9QXx4cRzA
+        fQBXKTVvAZXfl0Wshc15rHSWSw1aZyw2QueZloKWmSf/0uHFCIqFi84N1Vi51t+0tkgh5BGjIsH7
+        eFDLKKZG4vV6WGPY4OOaDvvwiDoB/J5f+rJxXuGzi7MFFl1enV1fXl3g29f71fT4fuF1Le0UpRKE
+        VBJxjzX2p+uv3zfmqozfNXPlTbXeLMEO8wpPvnMr+wsWKFfldfwL9UukmrltW1Tt+tw9I6JpZLg4
+        +gWhiqjRR4gMtI64Zlx9IDTSxqjjPG+MChvV5jDJMPXs8oBco0uWG9fDLRLXXE79+uemUWiRk9yF
+        68dpl4tIcB5rfVLhPSRhUax9yP7N3p7O1P7/szj60jbeA3f359+ucDkMu9k9SWJoHFOKWFnbNUI3
+        t18+POPGDfRktrWnM5saaXgzeQ7tiK5Gn9gamVuczRZrjP0WPrTzVyCMKhlpEWvFYp7wRHKsWmx7
+        65Nv3LZHhWUSqeMuiRg93nR1BcWyAyhuW+c/AoSxyMRGJ1RyrQXHlCNfD4xP5c6hRP2Xdhoyfhyw
+        gP7SvuDOA+TQzbOg8WhlBKohpGYinod68XlWTj3yNjaf7YQSufYkn5w6kRwqkBPb4kdm/7T/A1wb
+        FQALBQAA
+    headers:
+      CF-RAY:
+      - 9efa77fc881742af-EWR
+      Cache-Control:
+      - private, max-age=86400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 21 Apr 2026 06:52:55 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-headers:
+      - Accept,Content-Type,cookie,refresh-token,Accept-Encoding,Authorization,origin,referer,user-agent,Access-Control-Allow-Origin,indexes-0,indexes-1,indexes-2,indexes-3,indexes-4,indexes-5,indexes-6,indexes-7,x-workspace-password
+      access-control-allow-methods:
+      - GET,POST,PUT,PATCH,DELETE,OPTIONS
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - indexes-0,indexes-1,indexes-2,indexes-3,indexes-4,indexes-5,indexes-6,indexes-7,x-deprecated-dataset
+      cf-cache-status:
+      - DYNAMIC
+      content-security-policy:
+      - 'default-src ''self'';base-uri ''self'';font-src ''self'' https: data:;form-action
+        ''self'';frame-ancestors ''self'';img-src ''self'' data:;object-src ''none'';script-src
+        ''self'';script-src-attr ''none'';style-src ''self'' https: ''unsafe-inline'';upgrade-insecure-requests'
+      cross-origin-opener-policy:
+      - same-origin
+      cross-origin-resource-policy:
+      - same-origin
+      etag:
+      - W/"50b-n3CtoYB1b8cnqwFKqHWxjf/qjpU"
+      origin:
+      - GFW API Gateway
+      origin-agent-cluster:
+      - ?1
+      referrer-policy:
+      - no-referrer
+      strict-transport-security:
+      - max-age=15552000; includeSubDomains
+      transaction-id:
+      - 4b685f9f-3349-46d0-93aa-e156f5060d74
+      vary:
+      - Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-datasets:
+      - public-global-gaps-events:v4.0
+      x-dns-prefetch-control:
+      - 'off'
+      x-download-options:
+      - noopen
+      x-frame-options:
+      - SAMEORIGIN
+      x-permitted-cross-domain-policies:
+      - none
+      x-xss-protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1

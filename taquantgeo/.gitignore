@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.basedpyright/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+build/
+dist/
+wheels/
+.eggs/
+*.manifest
+.uv-cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_meta
+
+# Node / Next.js
+node_modules/
+.next/
+.turbo/
+out/
+.vercel/
+.pnpm-store/
+yarn-error.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/settings.example.json
+!.vscode/extensions.json
+.cursor/
+*.iml
+
+# Secrets — .env is committed for single-dev backup; rotate keys after any wipe
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+!secrets/gcp-taquantgeo.json
+.secrets/
+gcp-service-account*.json
+
+# Data — local only; shared archives live in R2
+data/raw/*
+data/interim/*
+!data/**/.gitkeep
+*.parquet
+!data/processed/**/*.parquet
+# Test fixtures are tiny, deterministic, checked in on purpose.
+!packages/**/tests/fixtures/**/*.parquet
+!tests/fixtures/**/*.parquet
+*.duckdb
+*.duckdb.wal
+*.dump
+
+# Logs + temp
+logs/
+*.log
+tmp/
+temp/
+
+# Docker volumes
+.docker-data/
+postgres-data/
+redis-data/
+
+# Built docs / artifacts
+site/
+backtest_results/
+reports/**
+!reports/
+!reports/ic_analysis.md
+
+# Autonomous build harness — ephemeral state (committed: phases/, templates/, handoffs/, *.md index files)
+.build/reports/
+.build/build_state.json
+.build/cost_ledger.json
+.build/manual_setup_required.md

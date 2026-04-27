@@ -1,0 +1,43 @@
+"area:ais":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/ais/**"]
+
+"area:signals":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/signals/**"]
+
+"area:backtest":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/backtest/**"]
+
+"area:trade":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/trade/**"]
+
+"area:api":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/api/**"]
+
+"area:jobs":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/jobs/**"]
+
+"area:cli":
+  - changed-files:
+      - any-glob-to-any-file: ["packages/cli/**"]
+
+"area:web":
+  - changed-files:
+      - any-glob-to-any-file: ["web/**"]
+
+"area:infra":
+  - changed-files:
+      - any-glob-to-any-file: ["infra/**", ".github/**"]
+
+"area:docs":
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "README.md", "CLAUDE.md"]
+
+"area:research":
+  - changed-files:
+      - any-glob-to-any-file: ["research/**"]
